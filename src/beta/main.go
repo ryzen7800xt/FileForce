@@ -22,11 +22,18 @@ var allowedExts = map[string]bool{
 	".mp4":  true,
 	".zip":  true,
 	".tscn": true,
+	
 }
 
 func main() {
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		log.Fatalf("create data dir: %v", err)
+	}
+
+	// initialize auth DB
+	dbPath := filepath.Join(dataDir, "auth.db")
+	if err := InitAuth(dbPath); err != nil {
+		log.Fatalf("init auth db: %v", err)
 	}
 
 	// Auth routes
