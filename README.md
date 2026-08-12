@@ -163,6 +163,37 @@ The current implementation is intentionally minimal. Before using in any public 
 
 FileForce is intentionally small so you can prototype storage workflows, auth flows, and optional Rust workers for CPU-bound tasks (thumbnailing, scanning, indexing) while keeping the core simple.
 
+## Running locally with Docker Compose
+
+You can run the Go server and Redis together using the provided `docker-compose.yml` at the repository root.
+
+```bash
+docker compose up --build
+```
+
+This mounts `./src/beta` into the Go container so code changes take effect immediately (it runs `go run .` inside the container). Redis will be available at `redis:6379` and the Go server will be reachable at `http://localhost:8080`.
+
+## Rust and C helpers (download clients)
+
+Two small client utilities are included to demonstrate saving files to the computer:
+
+- Rust downloader: `workers` is a Rust Cargo project. Build and run the downloader:
+
+```bash
+cd workers
+cargo run -- download http://localhost:8080/files/yourfile.tscn /tmp/yourfile.tscn
+```
+
+- C downloader: a tiny libcurl-based program is in `workers/c_client`. Build with a working libcurl installation:
+
+```bash
+cd workers/c_client
+make
+./download http://localhost:8080/files/yourfile.tscn /tmp/yourfile.tscn
+```
+
+These clients are minimal examples showing how to programmatically fetch files from FileForce and save them locally. Extend them to support authentication (cookie handling or token headers) as needed.
+
 ## Contributing
 
 Pull requests and suggestions welcome. Open an issue to discuss larger changes.

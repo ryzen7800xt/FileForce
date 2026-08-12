@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  app:
+    image: golang:1.20
+    working_dir: /app
+    volumes:
+      - ./src/beta:/app
+    environment:
+      - REDIS_ADDR=redis:6379
+    ports:
+      - "8080:8080"
+    command: bash -c "go run ."
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
