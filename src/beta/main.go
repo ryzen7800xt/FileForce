@@ -42,6 +42,12 @@ func main() {
 	http.HandleFunc("/logout", Logout)
 	http.HandleFunc("/api/register", APIregister)
 	http.Handle("/api/change-password", RequireAuth(http.HandlerFunc(APIchangePassword)))
+	http.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request){
+		http.ServeFile(w, r, "templates/register.html")
+	})
+
+	// serve static assets
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	// Public routes
 	http.HandleFunc("/files", listHandler)

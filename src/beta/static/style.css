@@ -1,0 +1,5 @@
+.box{max-width:360px;margin:80px auto;padding:20px;border:1px solid #ddd;border-radius:6px;font-family:Arial,Helvetica,sans-serif}
+label{display:block;margin:10px 0}
+input{width:100%;padding:8px;margin-top:4px;box-sizing:border-box}
+button{display:inline-block;padding:10px 16px;background:#007bff;border:none;color:#fff;border-radius:4px}
+p{margin-top:12px}
