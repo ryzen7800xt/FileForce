@@ -51,13 +51,39 @@ The server creates that user automatically on first run (password is stored as a
 - On successful login the server creates a random token mapped to the username in an in-memory session map and sets a `session` cookie. The cookie is `HttpOnly` and expires in 24 hours.
 - The `RequireAuth` middleware protects the `/upload` endpoint and the delete operation. Public endpoints like `/files` (listing and downloads) remain accessible without auth by default.
 
-Notes: sessions are currently stored in memory, so restarting the server clears sessions. Replace with Redis/DB for persistence.
+Notes: this version uses `bcrypt` for password hashing and supports persistent sessions in Redis. The server will try to initialize Redis on startup using the `REDIS_ADDR` environment variable (default `localhost:6379`). If Redis is unavailable the server logs a warning and operates without persistent sessions.
 
 ## File types and extension support
 
 The server enforces a simple allowlist for file extensions. Supported extensions include common types and the niche `.tscn` extension required for some game/editor files. The whitelist is in `src/beta/main.go` as `allowedExts`.
 
 To allow additional extensions, edit `allowedExts` in `src/beta/main.go` and restart the server.
+
+## Redis (sessions)
+
+FileForce can persist sessions in Redis for durability and multi-instance deployments. To run Redis locally with Docker:
+
+```bash
+docker run -d --name fileforce-redis -p 6379:6379 redis:7
+```
+
+Start the Go server with a `REDIS_ADDR` environment variable if Redis is not on the default host/port:
+
+```bash
+cd src/beta
+REDIS_ADDR=localhost:6379 go run .
+```
+
+When Redis is connected the server stores session tokens there; if Redis is not reachable the server logs a warning and continues (sessions are not persisted across restarts).
+
+## UI / Static files
+
+The repository provides minimal UI pages for authentication:
+
+- `GET /login` — login form (served from `src/beta/templates/login.html`)
+- `GET /register` — registration form (served from `src/beta/templates/register.html`)
+
+Static assets (CSS/JS) live in `src/beta/static` and are served from `/static/`.
 
 ## Examples (curl)
 

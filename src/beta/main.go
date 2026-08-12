@@ -36,6 +36,14 @@ func main() {
 		log.Fatalf("init auth db: %v", err)
 	}
 
+	// initialize Redis for session storage (optional). Set REDIS_ADDR env var (default: localhost:6379)
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if err := InitRedis(redisAddr); err != nil {
+		log.Printf("warning: failed to initialize Redis (%s): %v", redisAddr, err)
+	} else {
+		log.Printf("redis session store initialized (%s)", redisAddr)
+	}
+
 	// Auth routes
 	http.HandleFunc("/login", LoginPage)
 	http.HandleFunc("/api/login", APIlogin)
