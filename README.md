@@ -123,6 +123,20 @@ The current implementation is intentionally minimal. Before using in any public 
 - Implement role-based access control, sharing links, and file versioning.
 - Swap salted SHA-256 for `bcrypt` or `argon2` (strongly recommended).
 
+## New: registration, per-user directories, and Rust component
+
+- This version includes user registration (`POST /api/register`) and a password-change endpoint (`POST /api/change-password`).
+- Files are stored in per-user directories under `data/users/<username>/` when uploaded by authenticated users. The listing endpoint `GET /files` returns the current user's files by default. Use `GET /files?all=1` to list across users (admin use).
+- A small Rust component skeleton is included at `rust_component/` as an example worker (indexer/thumbnailer/async worker) you can extend. Build it with `cargo build` inside that directory.
+
+## How this compares to other file-sharing tools
+
+- Dropbox / Google Drive: full-featured clients, sync engines, real-time collaboration, and mature sharing controls. FileForce is a minimal backend skeleton focused on file storage APIs — it lacks sync clients, offline conflict resolution, and collaborative editing.
+- Nextcloud: offers self-hosted file storage with rich plugins, WebDAV, and user management. FileForce is a lightweight starting point; Nextcloud provides federation, apps, and production-ready components out of the box.
+- S3-backed solutions: scale and durability by design. FileForce stores files on disk by default; integrating S3 (or other object stores) is a recommended next step for durability and scalability.
+
+FileForce is intentionally small so you can prototype storage workflows, auth flows, and optional Rust workers for CPU-bound tasks (thumbnailing, scanning, indexing) while keeping the core simple.
+
 ## Contributing
 
 Pull requests and suggestions welcome. Open an issue to discuss larger changes.

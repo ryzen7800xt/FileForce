@@ -40,7 +40,7 @@ func InitDB(db *sql.DB) error {
 }
 
 func CreateUser(db *sql.DB, username, passwordHash string) error {
-    _, err := db.Exec("INSERT OR REPLACE INTO users(username, password_hash, created_at) VALUES(?,?,?)", username, passwordHash, time.Now().UTC())
+    _, err := db.Exec("INSERT INTO users(username, password_hash, created_at) VALUES(?,?,?)", username, passwordHash, time.Now().UTC())
     return err
 }
 
@@ -48,6 +48,20 @@ func GetUserHash(db *sql.DB, username string) (string, error) {
     var h string
     err := db.QueryRow("SELECT password_hash FROM users WHERE username = ?", username).Scan(&h)
     return h, err
+}
+
+func UpdateUserPassword(db *sql.DB, username, passwordHash string) error {
+    _, err := db.Exec("UPDATE users SET password_hash = ? WHERE username = ?", passwordHash, username)
+    return err
+}
+
+func UserExists(db *sql.DB, username string) (bool, error) {
+    var count int
+    err := db.QueryRow("SELECT COUNT(1) FROM users WHERE username = ?", username).Scan(&count)
+    if err != nil {
+        return false, err
+    }
+    return count > 0, nil
 }
 
 func CreateSession(db *sql.DB, token, username string, expires time.Time) error {

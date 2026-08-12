@@ -78,8 +78,8 @@ func APIlogin(w http.ResponseWriter, r *http.Request) {
         return
     }
     tok := newToken()
-    // persist session
-    _ = CreateSession(db, tok, u, time.Now().Add(24*time.Hour))
+    // persist session in Redis
+    _ = RedisCreateSession(tok, u, time.Now().Add(24*time.Hour))
 
     http.SetCookie(w, &http.Cookie{
         Name:     "session",
@@ -90,6 +90,76 @@ func APIlogin(w http.ResponseWriter, r *http.Request) {
     })
     // respond with JSON for API clients
     json.NewEncoder(w).Encode(map[string]string{"status": "ok", "user": u})
+}
+
+// APIregister handles user registration (development/demo use).
+func APIregister(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPost {
+        http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
+    if err := r.ParseForm(); err != nil {
+        http.Error(w, "bad request", http.StatusBadRequest)
+        return
+    }
+    u := r.FormValue("username")
+    p := r.FormValue("password")
+    if u == "" || p == "" {
+        http.Error(w, "missing fields", http.StatusBadRequest)
+        return
+    }
+    exists, err := UserExists(db, u)
+    if err != nil {
+        http.Error(w, "server error", http.StatusInternalServerError)
+        return
+    }
+    if exists {
+        http.Error(w, "user exists", http.StatusConflict)
+        return
+    }
+    if err := CreateUser(db, u, HashPassword(p)); err != nil {
+        http.Error(w, "create error", http.StatusInternalServerError)
+        return
+    }
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(map[string]string{"status": "created", "user": u})
+}
+
+// APIchangePassword allows an authenticated user to change their password.
+func APIchangePassword(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPost {
+        http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
+    user := GetUser(r)
+    if user == "" {
+        http.Error(w, "unauthorized", http.StatusUnauthorized)
+        return
+    }
+    if err := r.ParseForm(); err != nil {
+        http.Error(w, "bad request", http.StatusBadRequest)
+        return
+    }
+    old := r.FormValue("old_password")
+    nw := r.FormValue("new_password")
+    if old == "" || nw == "" {
+        http.Error(w, "missing fields", http.StatusBadRequest)
+        return
+    }
+    stored, err := GetUserHash(db, user)
+    if err != nil {
+        http.Error(w, "server error", http.StatusInternalServerError)
+        return
+    }
+    if !ComparePassword(stored, old) {
+        http.Error(w, "invalid current password", http.StatusUnauthorized)
+        return
+    }
+    if err := UpdateUserPassword(db, user, HashPassword(nw)); err != nil {
+        http.Error(w, "update error", http.StatusInternalServerError)
+        return
+    }
+    json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func Logout(w http.ResponseWriter, r *http.Request) {

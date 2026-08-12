@@ -40,6 +40,8 @@ func main() {
 	http.HandleFunc("/login", LoginPage)
 	http.HandleFunc("/api/login", APIlogin)
 	http.HandleFunc("/logout", Logout)
+	http.HandleFunc("/api/register", APIregister)
+	http.Handle("/api/change-password", RequireAuth(http.HandlerFunc(APIchangePassword)))
 
 	// Public routes
 	http.HandleFunc("/files", listHandler)
@@ -66,13 +68,19 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	defer f.Close()
 
 	name := filepath.Base(hdr.Filename)
+	user := GetUser(r)
+	// user should be present because upload is protected by RequireAuth
+	if user == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	// check allowed extensions
 	ext := strings.ToLower(filepath.Ext(name))
 	if !allowedExts[ext] {
 		http.Error(w, "file type not allowed", http.StatusBadRequest)
 		return
 	}
-	if err := SaveFile(name, f); err != nil {
+	if err := SaveFile(name, f, user); err != nil {
 		http.Error(w, "save error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -85,7 +93,16 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	files, err := ListFiles()
+	user := GetUser(r)
+	// support ?all=1 to list all files (admin use)
+	all := r.URL.Query().Get("all") == "1"
+	var files []string
+	var err error
+	if user != "" && !all {
+		files, err = ListFiles(user)
+	} else {
+		files, err = ListFiles("")
+	}
 	if err != nil {
 		http.Error(w, "list error: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -99,8 +116,18 @@ func fileHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing filename", http.StatusBadRequest)
 		return
 	}
-	safe := filepath.Base(name)
-	path := FilePath(safe)
+	// support URL forms: username/filename or filename (own)
+	parts := strings.SplitN(name, "/", 2)
+	var user, fname string
+	if len(parts) == 2 {
+		user = parts[0]
+		fname = parts[1]
+	} else {
+		user = GetUser(r)
+		fname = parts[0]
+	}
+	safe := filepath.Base(fname)
+	path := FilePath(user, safe)
 
 	switch r.Method {
 	case http.MethodGet:
