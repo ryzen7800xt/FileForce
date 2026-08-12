@@ -1,0 +1,123 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+const dataDir = "data" 
+
+var allowedExts = map[string]bool{
+	".txt":  true,
+	".pdf":  true,
+	".png":  true,
+	".jpg":  true,
+	".jpeg": true,
+	".mp3":  true,
+	".mp4":  true,
+	".zip":  true,
+	".tscn": true,
+}
+
+func main() {
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		log.Fatalf("create data dir: %v", err)
+	}
+
+	// Auth routes
+	http.HandleFunc("/login", LoginPage)
+	http.HandleFunc("/api/login", APIlogin)
+	http.HandleFunc("/logout", Logout)
+
+	// Public routes
+	http.HandleFunc("/files", listHandler)
+	http.HandleFunc("/files/", fileHandler)
+
+	// Protected routes
+	http.Handle("/upload", RequireAuth(http.HandlerFunc(uploadHandler)))
+
+	addr := ":8080"
+	fmt.Printf("server listening on %s\n", addr)
+	log.Fatal(http.ListenAndServe(addr, nil))
+}
+
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	f, hdr, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "missing file: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer f.Close()
+
+	name := filepath.Base(hdr.Filename)
+	// check allowed extensions
+	ext := strings.ToLower(filepath.Ext(name))
+	if !allowedExts[ext] {
+		http.Error(w, "file type not allowed", http.StatusBadRequest)
+		return
+	}
+	if err := SaveFile(name, f); err != nil {
+		http.Error(w, "save error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"name": name})
+}
+
+func listHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	files, err := ListFiles()
+	if err != nil {
+		http.Error(w, "list error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(files)
+}
+
+func fileHandler(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimPrefix(r.URL.Path, "/files/")
+	if name == "" {
+		http.Error(w, "missing filename", http.StatusBadRequest)
+		return
+	}
+	safe := filepath.Base(name)
+	path := FilePath(safe)
+
+	switch r.Method {
+	case http.MethodGet:
+		// download
+		f, err := os.Open(path)
+		if err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		defer f.Close()
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", safe))
+		http.ServeFile(w, r, path)
+	case http.MethodDelete:
+		// require auth for delete
+		if _, ok := fromRequest(r); !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if err := DeleteFile(safe); err != nil {
+			http.Error(w, "delete error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
